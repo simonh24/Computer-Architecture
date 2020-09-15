@@ -8,12 +8,13 @@ class CPU:
     def __init__(self):
         """Construct a new CPU."""
         self.ram = [0] * 256
-        self.registers = [0] * 8
+        self.reg = [0] * 8
         self.pc = 0
         self.running = True
         self.HLT = 0b00000001
         self.LDI = 0b10000010
         self.PRN = 0b01000111
+        self.MUL = 0b10100010
 
     def ram_read(self, mar):
         return self.ram[mar]
@@ -24,31 +25,53 @@ class CPU:
     def load(self):
         """Load a program into memory."""
 
-        address = 0
+        # address = 0
 
         # For now, we've just hardcoded a program:
 
-        program = [
-            # From print8.ls8
-            0b10000010, # LDI R0,8
-            0b00000000,
-            0b00001000,
-            0b01000111, # PRN R0
-            0b00000000,
-            0b00000001, # HLT
-        ]
+        # program = [
+        #     # From print8.ls8
+        #     0b10000010, # LDI R0,8
+        #     0b00000000,
+        #     0b00001000,
+        #     0b01000111, # PRN R0
+        #     0b00000000,
+        #     0b00000001, # HLT
+        # ]
 
-        for instruction in program:
-            self.ram[address] = instruction
-            address += 1
-
-
+        # for instruction in program:
+        #     self.ram[address] = instruction
+        #     address += 1
+        if len(sys.argv) != 2:
+            print("usage: ls8.py filename")
+            sys.exit(1)
+        try:
+            address = 0
+            with open(sys.argv[1]) as f:
+                for line in f:
+                    line = line.split("#")
+                    line = line[0].strip()
+                    if line == "":
+                        continue
+                    try:
+                        val = int(line, 2)
+                    except ValueError:
+                        print("invalid number")
+                        sys.exit(1)
+                    self.ram[address] = val
+                    address += 1
+        except FileNotFoundError:
+            print("file not found")
+            sys.exit(1)
+    
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
         if op == "ADD":
-            self.reg[reg_a] += self.reg[reg_b]
+            self.ram[reg_a] += self.ram[reg_b]
         #elif op == "SUB": etc
+        elif op == "MUL":
+            self.ram[reg_a] = self.ram[reg_a] * self.ram[reg_b]
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -89,3 +112,6 @@ class CPU:
             elif ir == self.PRN:
                 print(self.ram_read(operand_a))
                 self.pc += 2
+            elif ir == self.MUL:
+                self.alu("MUL", operand_a, operand_b)
+                self.pc += 3

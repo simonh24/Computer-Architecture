@@ -15,6 +15,9 @@ class CPU:
         self.LDI = 0b10000010
         self.PRN = 0b01000111
         self.MUL = 0b10100010
+        self.PUSH = 0b01000101
+        self.POP = 0b01000110
+        self.sp = 0xF4
 
     def ram_read(self, mar):
         return self.ram[mar]
@@ -115,3 +118,12 @@ class CPU:
             elif ir == self.MUL:
                 self.alu("MUL", operand_a, operand_b)
                 self.pc += 3
+            elif ir == self.PUSH:
+                self.sp -= 1
+                self.ram_write(self.sp, self.ram[operand_a])
+                self.pc += 2
+            elif ir == self.POP:
+                val = self.ram_read(self.sp)
+                self.sp += 1
+                self.ram_write(operand_a, val)
+                self.pc += 2

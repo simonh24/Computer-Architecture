@@ -17,7 +17,12 @@ class CPU:
         self.MUL = 0b10100010
         self.PUSH = 0b01000101
         self.POP = 0b01000110
-        self.sp = 0xF4
+        self.sp = 7
+        self.reg[self.sp] = 0xf4
+        self.CALL = 0b01010000
+        self.RET = 0b00010001
+        self.ADD = 0b10100000
+
 
     def ram_read(self, mar):
         return self.ram[mar]
@@ -71,10 +76,10 @@ class CPU:
         """ALU operations."""
 
         if op == "ADD":
-            self.ram[reg_a] += self.ram[reg_b]
+            self.reg[reg_a] += self.reg[reg_b]
         #elif op == "SUB": etc
         elif op == "MUL":
-            self.ram[reg_a] = self.ram[reg_a] * self.ram[reg_b]
+            self.reg[reg_a] *= self.reg[reg_b]
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -94,7 +99,7 @@ class CPU:
         ), end='')
 
         for i in range(8):
-            print(" %02X" % self.reg[i], end='')
+            print(" %02X" % self.ram[i], end='')
 
         print()
 
@@ -110,20 +115,37 @@ class CPU:
             if ir == self.HLT:
                 self.running = False
             elif ir == self.LDI:
-                self.ram_write(operand_a, operand_b)
+                self.reg[operand_a] = operand_b
                 self.pc += 3
             elif ir == self.PRN:
-                print(self.ram_read(operand_a))
+                print(self.reg[operand_a])
                 self.pc += 2
+            elif ir == self.ADD:
+                self.alu("ADD", operand_a, operand_b)
+                self.pc += 3
             elif ir == self.MUL:
                 self.alu("MUL", operand_a, operand_b)
                 self.pc += 3
             elif ir == self.PUSH:
-                self.sp -= 1
-                self.ram_write(self.sp, self.ram[operand_a])
+                reg = self.ram_read(self.pc + 1)
+                val = self.reg[reg]
+                self.reg[self.sp] -= 1
+                self.ram[self.reg[self.sp]] = val
                 self.pc += 2
             elif ir == self.POP:
-                val = self.ram_read(self.sp)
-                self.sp += 1
-                self.ram_write(operand_a, val)
+                val = self.ram[self.reg[self.sp]]
+                reg = self.ram_read(self.pc + 1)
+                self.reg[reg] = val
+                self.reg[self.sp] += 1
                 self.pc += 2
+            elif ir == self.CALL:
+                val = self.pc + 2
+                reg = self.ram[self.pc + 1]
+                sub = self.reg[reg]
+                self.reg[self.sp] -= 1
+                self.ram[self.reg[self.sp]] = val
+                self.pc = sub
+            elif ir == self.RET:
+                addr = self.reg[self.sp]
+                self.pc = self.ram[addr]
+                self.reg[self.sp] += 1

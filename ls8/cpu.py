@@ -10,6 +10,11 @@ class CPU:
         self.ram = [0] * 256
         self.reg = [0] * 8
         self.pc = 0
+        self.sp = 7
+        self.reg[self.sp] = 0xf4
+        self.E = 0
+        self.L = 0
+        self.G = 0
         self.running = True
         self.HLT = 0b00000001
         self.LDI = 0b10000010
@@ -17,12 +22,13 @@ class CPU:
         self.MUL = 0b10100010
         self.PUSH = 0b01000101
         self.POP = 0b01000110
-        self.sp = 7
-        self.reg[self.sp] = 0xf4
         self.CALL = 0b01010000
         self.RET = 0b00010001
         self.ADD = 0b10100000
-
+        self.CMP = 0b10100111
+        self.JMP = 0b01010100
+        self.JEQ = 0b01010101
+        self.JNE = 0b01010110
 
     def ram_read(self, mar):
         return self.ram[mar]
@@ -80,6 +86,19 @@ class CPU:
         #elif op == "SUB": etc
         elif op == "MUL":
             self.reg[reg_a] *= self.reg[reg_b]
+        elif op == "CMP":
+            if self.reg[reg_a] < self.reg[reg_b]:
+                self.L = 1
+                self.G = 0
+                self.E = 0
+            elif self.reg[reg_a] > self.reg[reg_b]:
+                self.L = 0
+                self.G = 1
+                self.E = 0
+            else:
+                self.L = 0
+                self.G = 0
+                self.E = 1
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -149,3 +168,18 @@ class CPU:
                 addr = self.reg[self.sp]
                 self.pc = self.ram[addr]
                 self.reg[self.sp] += 1
+            elif ir == self.CMP:
+                self.alu("CMP", operand_a, operand_b)
+                self.pc += 3
+            elif ir == self.JMP:
+                self.pc = self.reg[operand_a]
+            elif ir == self.JEQ:
+                if self.E == 1:
+                    self.pc = self.reg[operand_a]
+                else:
+                    self.pc += 2
+            elif ir == self.JNE:
+                if self.E == 0:
+                    self.pc = self.reg[operand_a]
+                else:
+                    self.pc += 2

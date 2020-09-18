@@ -7,36 +7,98 @@ class CPU:
 
     def __init__(self):
         """Construct a new CPU."""
-        pass
+        self.ram = [0] * 256
+        self.reg = [0] * 8
+        self.pc = 0
+        self.sp = 7
+        self.reg[self.sp] = 0xf4
+        self.E = 0
+        self.L = 0
+        self.G = 0
+        self.running = True
+        self.HLT = 0b00000001
+        self.LDI = 0b10000010
+        self.PRN = 0b01000111
+        self.MUL = 0b10100010
+        self.PUSH = 0b01000101
+        self.POP = 0b01000110
+        self.CALL = 0b01010000
+        self.RET = 0b00010001
+        self.ADD = 0b10100000
+        self.CMP = 0b10100111
+        self.JMP = 0b01010100
+        self.JEQ = 0b01010101
+        self.JNE = 0b01010110
+
+    def ram_read(self, mar):
+        return self.ram[mar]
+
+    def ram_write(self, mar, mdr):
+        self.ram[mar] = mdr
 
     def load(self):
         """Load a program into memory."""
 
-        address = 0
+        # address = 0
 
         # For now, we've just hardcoded a program:
 
-        program = [
-            # From print8.ls8
-            0b10000010, # LDI R0,8
-            0b00000000,
-            0b00001000,
-            0b01000111, # PRN R0
-            0b00000000,
-            0b00000001, # HLT
-        ]
+        # program = [
+        #     # From print8.ls8
+        #     0b10000010, # LDI R0,8
+        #     0b00000000,
+        #     0b00001000,
+        #     0b01000111, # PRN R0
+        #     0b00000000,
+        #     0b00000001, # HLT
+        # ]
 
-        for instruction in program:
-            self.ram[address] = instruction
-            address += 1
-
-
+        # for instruction in program:
+        #     self.ram[address] = instruction
+        #     address += 1
+        if len(sys.argv) != 2:
+            print("usage: ls8.py filename")
+            sys.exit(1)
+        try:
+            address = 0
+            with open(sys.argv[1]) as f:
+                for line in f:
+                    line = line.split("#")
+                    line = line[0].strip()
+                    if line == "":
+                        continue
+                    try:
+                        val = int(line, 2)
+                    except ValueError:
+                        print("invalid number")
+                        sys.exit(1)
+                    self.ram[address] = val
+                    address += 1
+        except FileNotFoundError:
+            print("file not found")
+            sys.exit(1)
+    
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
         #elif op == "SUB": etc
+        elif op == "MUL":
+            self.reg[reg_a] *= self.reg[reg_b]
+        elif op == "CMP":
+            if self.reg[reg_a] < self.reg[reg_b]:
+                self.L = 1
+                self.G = 0
+                self.E = 0
+            elif self.reg[reg_a] > self.reg[reg_b]:
+                self.L = 0
+                self.G = 1
+                self.E = 0
+            else:
+                self.L = 0
+                self.G = 0
+                self.E = 1
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -56,10 +118,68 @@ class CPU:
         ), end='')
 
         for i in range(8):
-            print(" %02X" % self.reg[i], end='')
+            print(" %02X" % self.ram[i], end='')
 
         print()
 
     def run(self):
         """Run the CPU."""
-        pass
+        while self.running:
+            ir = self.ram_read(self.pc)
+            try:
+                operand_a = self.ram_read(self.pc + 1)
+                operand_b = self.ram_read(self.pc + 2)
+            except IndexError:
+                print("operand out of range")
+            if ir == self.HLT:
+                self.running = False
+            elif ir == self.LDI:
+                self.reg[operand_a] = operand_b
+                self.pc += 3
+            elif ir == self.PRN:
+                print(self.reg[operand_a])
+                self.pc += 2
+            elif ir == self.ADD:
+                self.alu("ADD", operand_a, operand_b)
+                self.pc += 3
+            elif ir == self.MUL:
+                self.alu("MUL", operand_a, operand_b)
+                self.pc += 3
+            elif ir == self.PUSH:
+                reg = self.ram_read(self.pc + 1)
+                val = self.reg[reg]
+                self.reg[self.sp] -= 1
+                self.ram[self.reg[self.sp]] = val
+                self.pc += 2
+            elif ir == self.POP:
+                val = self.ram[self.reg[self.sp]]
+                reg = self.ram_read(self.pc + 1)
+                self.reg[reg] = val
+                self.reg[self.sp] += 1
+                self.pc += 2
+            elif ir == self.CALL:
+                val = self.pc + 2
+                reg = self.ram[self.pc + 1]
+                sub = self.reg[reg]
+                self.reg[self.sp] -= 1
+                self.ram[self.reg[self.sp]] = val
+                self.pc = sub
+            elif ir == self.RET:
+                addr = self.reg[self.sp]
+                self.pc = self.ram[addr]
+                self.reg[self.sp] += 1
+            elif ir == self.CMP:
+                self.alu("CMP", operand_a, operand_b)
+                self.pc += 3
+            elif ir == self.JMP:
+                self.pc = self.reg[operand_a]
+            elif ir == self.JEQ:
+                if self.E == 1:
+                    self.pc = self.reg[operand_a]
+                else:
+                    self.pc += 2
+            elif ir == self.JNE:
+                if self.E == 0:
+                    self.pc = self.reg[operand_a]
+                else:
+                    self.pc += 2
